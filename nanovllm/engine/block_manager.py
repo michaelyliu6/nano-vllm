@@ -93,22 +93,23 @@ class BlockManager:
         seq.block_table.clear()
 
     def can_append(self, seq: Sequence):
-        return len(self.free_block_ids) >= (len(seq) % self.block_size == 1)
+        need_new_block = len(seq) % self.block_size == 0
+        return len(self.free_block_ids) >= int(need_new_block)
 
     def may_append(self, seq: Sequence):
         block_table = seq.block_table
         last_block = self.blocks[block_table[-1]]
-        if len(seq) % self.block_size == 1:
-            assert last_block.hash != -1
+        if len(seq) % self.block_size == 0:
+            if last_block.hash == -1 and len(seq) > 0:
+                token_ids = seq.block(seq.num_blocks - 1)
+                prefix = (
+                    self.blocks[block_table[-2]].hash if len(block_table) > 1 else -1
+                )
+                h = compute_hash(token_ids, prefix)
+                last_block.update(h, token_ids)
+                self.hash_to_block_id[h] = last_block.block_id
             block_id = self.free_block_ids[0]
             self._allocate_block(block_id)
             block_table.append(block_id)
-        elif len(seq) % self.block_size == 0:
-            assert last_block.hash == -1
-            token_ids = seq.block(seq.num_blocks-1)
-            prefix = self.blocks[block_table[-2]].hash if len(block_table) > 1 else -1
-            h = compute_hash(token_ids, prefix)
-            last_block.update(h, token_ids)
-            self.hash_to_block_id[h] = last_block.block_id
         else:
             assert last_block.hash == -1
